@@ -16,26 +16,38 @@ package imagepipeline
 
 import (
 	"bytes"
+	"context"
 	"image"
+
+	"github.com/disintegration/imaging"
 )
 
 type Image struct {
 	// previous is the previous before handle
 	previous *Image
-	// data is the raw data of image
-	data []byte
-	img  image.Image
+	// originalSize is the original raw data size of image
+	originalSize int
+	// grid is the grid of color.Color values
+	grid image.Image
+	// optimizedData is the data of optimize image
+	optimizedData []byte
+	// format is the format type of image
+	format string
 }
+
+// Job is the image pipeline job
+type Job func(context.Context, *Image) (*Image, error)
 
 // NewImageFromBytes returns a image from byte data, an error will be return if decode fail
 func NewImageFromBytes(data []byte) (*Image, error) {
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	return &Image{
-		data: data,
-		img:  img,
+		originalSize: len(data),
+		format:       format,
+		grid:         img,
 	}, nil
 }
 
@@ -44,57 +56,57 @@ func (i *Image) Previous() *Image {
 	return i.previous
 }
 
-// Image returns image interface
-func (i *Image) Image() (image.Image, error) {
-	if i.img == nil {
-		img, _, err := image.Decode(bytes.NewReader(i.data))
-		if err != nil {
-			return nil, err
-		}
-		i.img = img
-	}
-	return i.img, nil
-}
-
-// Data returns the raw data of image
-func (i *Image) Data() []byte {
-	return i.data
-}
-
-// Size returns the size of image's data
-func (i *Image) Size() int {
-	return len(i.data)
-}
-
-func (i *Image) bounds() (*image.Rectangle, error) {
-	img, err := i.Image()
-	if err != nil {
-		return nil, err
-	}
-	r := img.Bounds()
-	return &r, nil
+// Set sets the image grid
+func (i *Image) Set(grid image.Image) {
+	previous := &(*i)
+	i.previous = previous
+	// the image is changed, reset the optimized data
+	i.optimizedData = nil
+	i.grid = grid
 }
 
 // Width returns the width of image
-func (i *Image) Width() (int, error) {
-	b, err := i.bounds()
-	if err != nil {
-		return 0, err
-	}
-	return b.Dx(), nil
+func (i *Image) Width() int {
+	return i.grid.Bounds().Dx()
 }
 
 // Height returns the height of image
-func (i *Image) Height() (int, error) {
-	b, err := i.bounds()
-	if err != nil {
-		return 0, err
-	}
-	return b.Dy(), nil
+func (i *Image) Height() int {
+	return i.grid.Bounds().Dy()
 }
 
-// SetData sets the data of image, and clear the image interface
-func (i *Image) SetData(data []byte) {
-	i.data = data
-	i.img = nil
+func (i *Image) setOptimized(data []byte, format string) {
+	i.optimizedData = data
+	i.format = format
+}
+
+func (i *Image) encode(format string) ([]byte, error) {
+	buffer := bytes.Buffer{}
+	f := imaging.JPEG
+	if format == ImageTypePNG {
+		f = imaging.PNG
+	}
+	err := imaging.Encode(&buffer, i.grid, f)
+	if err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// PNG encodes the image as png, and returns the bytes
+func (i *Image) PNG() ([]byte, error) {
+	if i.format == ImageTypePNG &&
+		len(i.optimizedData) != 0 {
+		return i.optimizedData, nil
+	}
+	return i.encode(ImageTypePNG)
+}
+
+// JPEG encodes the image as jpeg, and returns the bytes
+func (i *Image) JPEG() ([]byte, error) {
+	if i.format == ImageTypeJPEG &&
+		len(i.optimizedData) != 0 {
+		return i.optimizedData, nil
+	}
+	return i.encode(ImageTypeJPEG)
 }
