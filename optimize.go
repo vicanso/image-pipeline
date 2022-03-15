@@ -17,7 +17,6 @@ package imagepipeline
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"sync"
 
@@ -93,11 +92,10 @@ func optimize(ctx context.Context, addr string, img *Image, quality int, format 
 	return img, nil
 }
 
-// NewAutoOptimizeImage creates an optimize image job, which will detect http request header, then find the match type for optimizing
-func NewAutoOptimizeImage(addr string, quality int, header http.Header) Job {
+// NewAutoOptimizeImage creates an optimize image job, which will find the match type for optimizing by accept
+func NewAutoOptimizeImage(addr string, quality int, accept string) Job {
 	return func(ctx context.Context, img *Image) (*Image, error) {
 		format := img.format
-		accept := header.Get("Accept")
 		acceptWebp := strings.Contains(accept, "image/webp")
 		acceptAvif := strings.Contains(accept, "image/avif")
 

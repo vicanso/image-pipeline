@@ -33,7 +33,7 @@ func FetchImageFromURL(ctx context.Context, url string) (*Image, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch image fail, %d", resp.StatusCode)
+		return nil, fmt.Errorf("fetch image fail, status:%d", resp.StatusCode)
 	}
 	buf, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

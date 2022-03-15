@@ -17,6 +17,9 @@ package imagepipeline
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -57,4 +60,121 @@ func Do(ctx context.Context, img *Image, jobs ...Job) (*Image, error) {
 		}
 	}
 	return img, nil
+}
+
+type Parser func(params []string, accept string) (Job, error)
+
+func parseProxy(params []string, _ string) (Job, error) {
+	if len(params) == 0 {
+		return nil, errors.New("proxy url can not be nil")
+	}
+	proxyURL, err := url.QueryUnescape(params[0])
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, _ *Image) (*Image, error) {
+		return FetchImageFromURL(ctx, proxyURL)
+	}, nil
+}
+
+func parseOptimize(params []string, _ string) (Job, error) {
+	if len(params) == 0 {
+		return nil, errors.New("optimize addr can not be nil")
+	}
+	addr := params[0]
+	quality := 0
+	if len(params) > 2 {
+		quality, _ = strconv.Atoi(params[1])
+	}
+	formats := make([]string, 0)
+
+	if len(params) > 2 {
+		formats = append(formats, params[2])
+	}
+	return NewOptimizeImage(addr, quality, formats...), nil
+}
+
+func parseAutoOptimize(params []string, accept string) (Job, error) {
+	if len(params) == 0 {
+		return nil, errors.New("optimize addr can not be nil")
+	}
+	quality := 0
+	if len(params) > 1 {
+		quality, _ = strconv.Atoi(params[1])
+	}
+	return NewAutoOptimizeImage(params[0], quality, accept), nil
+}
+
+func parseFitResize(params []string, _ string) (Job, error) {
+	if len(params) != 2 {
+		return nil, errors.New("fit resize width and height can not be nil")
+	}
+	// 如果转换出错，则直接用0
+	width, _ := strconv.Atoi(params[0])
+	height, _ := strconv.Atoi(params[1])
+	return NewFitResizeImage(width, height), nil
+}
+
+func parseFillResize(params []string, _ string) (Job, error) {
+	if len(params) != 2 {
+		return nil, errors.New("fill resize width and height can not be nil")
+	}
+	// 如果转换出错，则直接用0
+	width, _ := strconv.Atoi(params[0])
+	height, _ := strconv.Atoi(params[1])
+	return NewFillResizeImage(width, height), nil
+}
+
+func parseFinder(params []string, _ string) (Job, error) {
+	if len(params) == 0 {
+		return nil, errors.New("finder name can not be nil")
+	}
+	f, err := GetFinder(params[0])
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context, _ *Image) (*Image, error) {
+		return f.Find(ctx, params[1:]...)
+	}, nil
+}
+
+const (
+	TaskProxy        = "proxy"
+	TaskOptimize     = "optimize"
+	TaskAutoOptimize = "autoOptimize"
+	TaskFitResize    = "fitResize"
+	TaskFillResize   = "fillResize"
+)
+
+// Parse parses the task pipe line to job list
+func Parse(taskPipeLine, accept string) ([]Job, error) {
+	tasks := strings.Split(taskPipeLine, "|")
+	jobs := make([]Job, 0, len(tasks))
+	for _, v := range tasks {
+		var fn Parser
+		arr := strings.Split(v, "/")
+		args := arr[1:]
+		switch arr[0] {
+		case TaskProxy:
+			fn = parseProxy
+		case TaskOptimize:
+			fn = parseOptimize
+		case TaskAutoOptimize:
+			fn = parseAutoOptimize
+		case TaskFitResize:
+			fn = parseFitResize
+		case TaskFillResize:
+			fn = parseFillResize
+		default:
+			// finder的参数为所有参数
+			args = arr
+			fn = parseFinder
+		}
+		job, err := fn(args, accept)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
 }
