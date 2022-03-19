@@ -58,8 +58,8 @@ func (i *Image) Previous() *Image {
 
 // Set sets the image grid
 func (i *Image) Set(grid image.Image) {
-	previous := &(*i)
-	i.previous = previous
+	previous := *i
+	i.previous = &previous
 	// the image is changed, reset the optimized data
 	i.optimizedData = nil
 	i.grid = grid

@@ -23,6 +23,7 @@ import (
 	"github.com/vicanso/tiny/pb"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var grpcSF = singleflight.Group{}
@@ -45,7 +46,7 @@ func newTinyConnection(ctx context.Context, addr string) (*grpc.ClientConn, erro
 		return convertToConnection(value)
 	}
 	value, err, _ := grpcSF.Do(addr, func() (interface{}, error) {
-		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure())
+		conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return nil, err
 		}

@@ -19,7 +19,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net/url"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +66,10 @@ func AddHTTPFinder(name, uri string, onStatus ...upstream.StatusListener) error 
 		Ping: urlInfo.Path,
 	}
 	for _, host := range strings.Split(urlInfo.Host, ",") {
-		uh.Add(urlInfo.Scheme + "://" + host)
+		err := uh.Add(urlInfo.Scheme + "://" + host)
+		if err != nil {
+			return err
+		}
 	}
 	if len(onStatus) != 0 {
 		uh.OnStatus(onStatus[0])
@@ -74,7 +79,7 @@ func AddHTTPFinder(name, uri string, onStatus ...upstream.StatusListener) error 
 	f := finder{
 		Find: func(ctx context.Context, params ...string) (*Image, error) {
 			if len(params) < 1 {
-				return nil, errors.New("http params should be on parameter")
+				return nil, errors.New("http params should be one parameter")
 			}
 			requestURI, err := url.QueryUnescape(params[0])
 			if err != nil {
@@ -90,6 +95,30 @@ func AddHTTPFinder(name, uri string, onStatus ...upstream.StatusListener) error 
 			uh.StopHealthCheck()
 			return nil
 		},
+	}
+	finders.Store(name, &f)
+	return nil
+}
+
+// AddFileFinder adds a file finder
+func AddFileFinder(name, basePath string) error {
+	f := finder{
+		Find: func(ctx context.Context, params ...string) (*Image, error) {
+			if len(params) < 1 {
+				return nil, errors.New("file params should be one parameter")
+			}
+			file := path.Join(basePath, params[0])
+			// 避免文件超出目录
+			if !strings.HasPrefix(file, basePath) {
+				return nil, errors.New("file name is invald")
+			}
+			buf, err := ioutil.ReadFile(file)
+			if err != nil {
+				return nil, err
+			}
+			return NewImageFromBytes(buf)
+		},
+		Close: noop,
 	}
 	finders.Store(name, &f)
 	return nil
