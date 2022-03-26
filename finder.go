@@ -45,16 +45,50 @@ type Finder interface {
 	Close(ctx context.Context) error
 }
 
-type finder struct {
-	Find  func(ctx context.Context, params ...string) (*Image, error)
-	Close func(ctx context.Context) error
+var finders = sync.Map{}
+
+// func init() {
+// 	initFinderFromENV()
+// }
+
+// func initFinderFromENV() {
+// 	finderPrefix := os.Getenv("IMAGE_PIPELINE_FINDER")
+// 	if finderPrefix != "" {
+// 		return
+// 	}
+// 	envs := os.Environ()
+// 	for _, item := range envs {
+// 		arr := strings.Split(item, "=")
+// 		if len(arr) != 2 {
+// 			continue
+// 		}
+// 		fmt.Println(arr[0])
+// 		// fmt.Println(arr)
+// 	}
+// }
+
+type httpFinder struct {
+	uh *upstream.HTTP
 }
 
-func noop(ctx context.Context) error {
+func (hf *httpFinder) Find(ctx context.Context, params ...string) (*Image, error) {
+	if len(params) < 1 {
+		return nil, errors.New("http params should be one parameter")
+	}
+	requestURI, err := url.QueryUnescape(params[0])
+	if err != nil {
+		return nil, err
+	}
+	u := hf.uh.PolicyRoundRobin()
+	if u == nil {
+		return nil, errors.New("get http upstream fail")
+	}
+	return FetchImageFromURL(ctx, u.URL.String()+requestURI)
+}
+func (hf *httpFinder) Close(ctx context.Context) error {
+	hf.uh.StopHealthCheck()
 	return nil
 }
-
-var finders = sync.Map{}
 
 // AddHTTPFinder adds a http finder
 func AddHTTPFinder(name, uri string, onStatus ...upstream.StatusListener) error {
@@ -74,53 +108,65 @@ func AddHTTPFinder(name, uri string, onStatus ...upstream.StatusListener) error 
 	if len(onStatus) != 0 {
 		uh.OnStatus(onStatus[0])
 	}
-
+	uh.DoHealthCheck()
 	go uh.StartHealthCheck()
-	f := finder{
-		Find: func(ctx context.Context, params ...string) (*Image, error) {
-			if len(params) < 1 {
-				return nil, errors.New("http params should be one parameter")
-			}
-			requestURI, err := url.QueryUnescape(params[0])
-			if err != nil {
-				return nil, err
-			}
-			u := uh.PolicyRoundRobin()
-			if u == nil {
-				return nil, errors.New("get http upstream fail")
-			}
-			return FetchImageFromURL(ctx, u.URL.String()+requestURI)
-		},
-		Close: func(ctx context.Context) error {
-			uh.StopHealthCheck()
-			return nil
-		},
+	finders.Store(name, &httpFinder{
+		uh: uh,
+	})
+	return nil
+}
+
+type fileFinder struct {
+	basePath string
+}
+
+func (ff *fileFinder) Find(ctx context.Context, params ...string) (*Image, error) {
+	if len(params) < 1 {
+		return nil, errors.New("file params should be one parameter")
 	}
-	finders.Store(name, &f)
+	file := path.Join(ff.basePath, params[0])
+	// 避免文件超出目录
+	if !strings.HasPrefix(file, ff.basePath) {
+		return nil, errors.New("file name is invald")
+	}
+	buf, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	return NewImageFromBytes(buf)
+}
+
+func (ff *fileFinder) Close(_ context.Context) error {
 	return nil
 }
 
 // AddFileFinder adds a file finder
 func AddFileFinder(name, basePath string) error {
-	f := finder{
-		Find: func(ctx context.Context, params ...string) (*Image, error) {
-			if len(params) < 1 {
-				return nil, errors.New("file params should be one parameter")
-			}
-			file := path.Join(basePath, params[0])
-			// 避免文件超出目录
-			if !strings.HasPrefix(file, basePath) {
-				return nil, errors.New("file name is invald")
-			}
-			buf, err := ioutil.ReadFile(file)
-			if err != nil {
-				return nil, err
-			}
-			return NewImageFromBytes(buf)
-		},
-		Close: noop,
+	finders.Store(name, &fileFinder{
+		basePath: basePath,
+	})
+	return nil
+}
+
+type minioFinder struct {
+	client *minio.Client
+}
+
+func (mf *minioFinder) Find(ctx context.Context, params ...string) (*Image, error) {
+	if len(params) < 2 {
+		return nil, errors.New("minio param should be two parameters")
 	}
-	finders.Store(name, &f)
+	obj, err := mf.client.GetObject(ctx, params[0], params[1], minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
+	}
+	buf, err := io.ReadAll(obj)
+	if err != nil {
+		return nil, err
+	}
+	return NewImageFromBytes(buf)
+}
+func (mf *minioFinder) Close(_ context.Context) error {
 	return nil
 }
 
@@ -132,32 +178,51 @@ func AddMinioFinder(name, uri string) error {
 	}
 	accessKey := urlInfo.Query().Get("accessKey")
 	secretKey := urlInfo.Query().Get("secretKey")
-	minioClient, err := minio.New(urlInfo.Host, &minio.Options{
+	client, err := minio.New(urlInfo.Host, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
 		return err
 	}
-	f := finder{
-		Find: func(ctx context.Context, params ...string) (*Image, error) {
-			if len(params) < 2 {
-				return nil, errors.New("minio param should be two parameters")
-			}
-			obj, err := minioClient.GetObject(ctx, params[0], params[1], minio.GetObjectOptions{})
-			if err != nil {
-				return nil, err
-			}
-			buf, err := io.ReadAll(obj)
-			if err != nil {
-				return nil, err
-			}
-			return NewImageFromBytes(buf)
-		},
-		Close: noop,
-	}
-	finders.Store(name, &f)
+	finders.Store(name, &minioFinder{
+		client: client,
+	})
 	return nil
+}
+
+type gridFSFinder struct {
+	database string
+	client   *mongo.Client
+}
+
+func (gf *gridFSFinder) Find(ctx context.Context, params ...string) (*Image, error) {
+	if len(params) == 0 {
+		return nil, errors.New("gridfs param should be one parameter")
+	}
+	db := gf.client.Database(gf.database)
+	collection := options.DefaultName
+	if len(params) > 1 {
+		collection = params[1]
+	}
+	bucket, err := gridfs.NewBucket(db, options.GridFSBucket().SetName(collection))
+	if err != nil {
+		return nil, err
+	}
+	buffer := bytes.Buffer{}
+	id, err := primitive.ObjectIDFromHex(params[0])
+	if err != nil {
+		return nil, err
+	}
+	_, err = bucket.DownloadToStream(id, &buffer)
+	if err != nil {
+		return nil, err
+	}
+	return NewImageFromBytes(buffer.Bytes())
+}
+
+func (gf *gridFSFinder) Close(ctx context.Context) error {
+	return gf.client.Disconnect(ctx)
 }
 
 // AddGridFSFinder adds mongodb gridfs finder
@@ -175,36 +240,37 @@ func AddGridFSFinder(name, uri string) error {
 	if err != nil {
 		return err
 	}
-	f := finder{
-		Find: func(ctx context.Context, params ...string) (*Image, error) {
-			if len(params) == 0 {
-				return nil, errors.New("gridfs param should be one parameter")
-			}
-			db := client.Database(cs.Database)
-			collection := options.DefaultName
-			if len(params) > 1 {
-				collection = params[1]
-			}
-			bucket, err := gridfs.NewBucket(db, options.GridFSBucket().SetName(collection))
-			if err != nil {
-				return nil, err
-			}
-			buffer := bytes.Buffer{}
-			id, err := primitive.ObjectIDFromHex(params[0])
-			if err != nil {
-				return nil, err
-			}
-			_, err = bucket.DownloadToStream(id, &buffer)
-			if err != nil {
-				return nil, err
-			}
-			return NewImageFromBytes(buffer.Bytes())
-		},
-		Close: func(ctx context.Context) error {
-			return client.Disconnect(ctx)
-		},
+	finders.Store(name, &gridFSFinder{
+		client:   client,
+		database: cs.Database,
+	})
+	return nil
+}
+
+type aliyunOSSFinder struct {
+	client *oss.Client
+}
+
+func (af *aliyunOSSFinder) Find(_ context.Context, params ...string) (*Image, error) {
+	if len(params) < 2 {
+		return nil, errors.New("oss param should be two parameters")
 	}
-	finders.Store(name, &f)
+	bucket, err := af.client.Bucket(params[0])
+	if err != nil {
+		return nil, err
+	}
+	r, err := bucket.GetObject(params[1])
+	if err != nil {
+		return nil, err
+	}
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return NewImageFromBytes(buf)
+}
+
+func (af *aliyunOSSFinder) Close(_ context.Context) error {
 	return nil
 }
 
@@ -223,29 +289,9 @@ func AddAliyunOSSFinder(name, uri string) error {
 	if err != nil {
 		return err
 	}
-	f := finder{
-		Find: func(_ context.Context, params ...string) (*Image, error) {
-			if len(params) < 2 {
-				return nil, errors.New("oss param should be two parameters")
-			}
-			bucket, err := client.Bucket(params[0])
-			if err != nil {
-				return nil, err
-			}
-			r, err := bucket.GetObject(params[1])
-			if err != nil {
-				return nil, err
-			}
-			buf, err := io.ReadAll(r)
-			if err != nil {
-				return nil, err
-			}
-
-			return NewImageFromBytes(buf)
-		},
-		Close: noop,
-	}
-	finders.Store(name, &f)
+	finders.Store(name, &aliyunOSSFinder{
+		client: client,
+	})
 	return nil
 }
 
@@ -255,11 +301,11 @@ func GetFinder(name string) (Finder, error) {
 	if !ok {
 		return nil, ErrFinderNotFound
 	}
-	fn, ok := value.(Finder)
+	f, ok := value.(Finder)
 	if !ok {
 		return nil, ErrFinderInValid
 	}
-	return fn, nil
+	return f, nil
 }
 
 // RangeFinder calls fn sequentially for each key and find in the finders
