@@ -83,7 +83,7 @@ func parseOptimize(params []string, _ string) (Job, error) {
 	}
 	addr := params[0]
 	quality := 0
-	if len(params) > 2 {
+	if len(params) > 1 {
 		quality, _ = strconv.Atoi(params[1])
 	}
 	formats := make([]string, 0)

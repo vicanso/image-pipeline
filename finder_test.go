@@ -18,8 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"image"
-	"image/png"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -30,14 +28,11 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-func newImageData() []byte {
-	img := image.NewRGBA(image.Rectangle{image.Point{0, 0}, image.Point{1, 1}})
-	buffer := bytes.Buffer{}
-	_ = png.Encode(&buffer, img)
-	return buffer.Bytes()
-}
 
 func TestAddHTTPFinder(t *testing.T) {
 
@@ -74,8 +69,8 @@ func TestAddHTTPFinder(t *testing.T) {
 
 	img, err := finder.Find(context.Background(), "/image")
 	assert.Nil(err)
-	assert.Equal(1, img.Width())
-	assert.Equal(1, img.Height())
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
 
 	err = finder.Close(context.Background())
 	assert.Nil(err)
@@ -99,8 +94,8 @@ func TestFileFinder(t *testing.T) {
 
 	img, err := finder.Find(context.Background(), file)
 	assert.Nil(err)
-	assert.Equal(1, img.Width())
-	assert.Equal(1, img.Height())
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
 }
 
 func TestMinioFinder(t *testing.T) {
@@ -136,36 +131,60 @@ func TestMinioFinder(t *testing.T) {
 
 	img, err := finder.Find(context.Background(), bucket, objName)
 	assert.Nil(err)
-	assert.Equal(1, img.Width())
-	assert.Equal(1, img.Height())
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
 }
 
-// func TestGridFSFinder(t *testing.T) {
-// 	assert := assert.New(t)
+func TestGridFSFinder(t *testing.T) {
+	assert := assert.New(t)
 
-// 	finderName := "gridFinder"
-// 	database := "test"
-// 	uri := "mongodb://test:testabcd@127.0.0:27017/" + database
-// 	fileName := "test.png"
+	finderName := "gridFinder"
+	database := "admin"
+	uri := "mongodb://test:testabcd@127.0.0.1:27017/" + database
+	fileName := "test.png"
 
-// 	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
-// 	assert.Nil(err)
-// 	bucket, err := gridfs.NewBucket(client.Database(database), options.GridFSBucket().SetName(options.DefaultName))
-// 	assert.Nil(err)
-// 	fmt.Println(bucket)
-// 	fmt.Println(fileName)
-// 	fmt.Println(finderName)
-// 	stream, err := bucket.OpenUploadStream(fileName)
-// 	assert.Nil(err)
-// 	fmt.Println(stream)
-// 	assert.Nil(false)
-// 	// _, err = stream.Write(newImageData())
-// 	// assert.Nil(err)
-// 	// err = stream.Close()
-// 	// assert.Nil(err)
-// 	// fmt.Println(stream.FileID)
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI(uri))
+	assert.Nil(err)
+	bucket, err := gridfs.NewBucket(client.Database(database), options.GridFSBucket().SetName(options.DefaultName))
+	assert.Nil(err)
+	stream, err := bucket.OpenUploadStream(fileName)
+	assert.Nil(err)
+	_, err = stream.Write(newImageData())
+	assert.Nil(err)
+	err = stream.Close()
+	assert.Nil(err)
 
-// 	// err = AddGridFSFinder(finderName, uri)
-// 	// assert.Nil(err)
+	err = AddGridFSFinder(finderName, uri)
+	assert.Nil(err)
 
-// }
+	finder, err := GetFinder(finderName)
+	assert.Nil(err)
+	assert.NotNil(finder)
+	defer finder.Close(context.Background())
+	id, ok := stream.FileID.(primitive.ObjectID)
+	assert.True(ok)
+	img, err := finder.Find(context.Background(), id.Hex())
+	assert.Nil(err)
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
+}
+
+func TestAliyunOSSFinder(t *testing.T) {
+	assert := assert.New(t)
+
+	accessKey := os.Getenv("ALIYUN_OSS_ACCESS_KEY")
+	secretKey := os.Getenv("ALIYUN_OSS_SECRET_KEY")
+	uri := fmt.Sprintf("https://oss-cn-beijing.aliyuncs.com?accessKey=%s&secretKey=%s", accessKey, secretKey)
+
+	finderName := "aliyunOSSFinder"
+	err := AddAliyunOSSFinder(finderName, uri)
+	assert.Nil(err)
+	finder, err := GetFinder(finderName)
+	assert.Nil(err)
+	assert.NotNil(finder)
+
+	img, err := finder.Find(context.Background(), "tinysite", "go-echarts.jpg")
+	assert.Nil(err)
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
+}
