@@ -15,57 +15,26 @@
 package imagepipeline
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseProxy(t *testing.T) {
+func TestNewWatermark(t *testing.T) {
 	assert := assert.New(t)
 
-	_, err := parseProxy([]string{
-		"https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png",
-	}, "")
+	img, err := NewImageFromBytes(newImageData())
 	assert.Nil(err)
-}
 
-func TestParseOptimize(t *testing.T) {
-	assert := assert.New(t)
-
-	_, err := parseOptimize([]string{
-		"127.0.0.1:6002",
-		"90",
-		"png",
-	}, "")
+	watermark, err := NewFitResizeImage(100, 100)(context.Background(), img)
 	assert.Nil(err)
-}
 
-func TestParseAutoOptimize(t *testing.T) {
-	assert := assert.New(t)
-
-	_, err := parseAutoOptimize([]string{
-		"127.0.0.1:6002",
-		"80",
-	}, "image/avif,image/webp")
+	img, err = NewImageFromBytes(newImageData())
 	assert.Nil(err)
-}
-
-func TestParseFitResize(t *testing.T) {
-	assert := assert.New(t)
-
-	_, err := parseAutoOptimize([]string{
-		"100",
-		"80",
-	}, "")
+	fn := NewWatermark(watermark.grid, PositionBottom, 0)
+	img, err = fn(context.Background(), img)
 	assert.Nil(err)
-}
-
-func TestParseFillResize(t *testing.T) {
-	assert := assert.New(t)
-
-	_, err := parseFillResize([]string{
-		"100",
-		"80",
-	}, "")
-	assert.Nil(err)
+	assert.Equal(829, img.Width())
+	assert.Equal(846, img.Height())
 }
