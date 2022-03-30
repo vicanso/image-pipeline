@@ -79,7 +79,6 @@ func TestAddHTTPFinder(t *testing.T) {
 func TestFileFinder(t *testing.T) {
 	assert := assert.New(t)
 	basePath := os.TempDir()
-	defer os.RemoveAll(basePath)
 	finderName := "fileFinder"
 	err := AddFileFinder(finderName, basePath)
 	assert.Nil(err)

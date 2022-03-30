@@ -53,7 +53,7 @@ func TestParseAutoOptimize(t *testing.T) {
 func TestParseFitResize(t *testing.T) {
 	assert := assert.New(t)
 
-	_, err := parseAutoOptimize([]string{
+	_, err := parseFitResize([]string{
 		"100",
 		"80",
 	}, "")

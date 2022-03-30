@@ -22,40 +22,46 @@ import (
 	"github.com/disintegration/imaging"
 )
 
+func getWatermarkPosition(position string, w, h, watermarkWidth, watermarkHeight int) (int, int) {
+	x := 0
+	y := 0
+	// PositionTopLeft 为0,0 不需要处理
+	switch position {
+	case PositionTop:
+		x = (w - watermarkWidth) / 2
+	case PositionTopRight:
+		x = w - watermarkWidth
+	case PositionLeft:
+		y = (h - watermarkHeight) / 2
+	case PositionCenter:
+		x = (w - watermarkWidth) / 2
+		y = (h - watermarkHeight) / 2
+	case PositionRight:
+		y = (h - watermarkHeight) / 2
+		x = w - watermarkWidth
+	case PositionBottomLeft:
+		y = h - watermarkHeight
+	case PositionBottom:
+		x = (w - watermarkWidth) / 2
+		y = h - watermarkHeight
+	case PositionBottomRight:
+		x = w - watermarkWidth
+		y = h - watermarkHeight
+	}
+	return x, y
+}
+
 // NewWatermark creates an image job, which will add watermark to image
-func NewWatermark(watermarkImg image.Image, postion string, angle float64) Job {
+func NewWatermark(watermarkImg image.Image, position string, angle float64) Job {
 	return func(ctx context.Context, img *Image) (*Image, error) {
 		if angle != 0 {
 			watermarkImg = imaging.Rotate(watermarkImg, angle, color.Transparent)
 		}
-		x := 0
-		y := 0
 		w := img.Width()
 		h := img.Height()
 		watermarkWidth := watermarkImg.Bounds().Dx()
 		watermarkHeight := watermarkImg.Bounds().Dy()
-		switch postion {
-		case PositionTop:
-			x = (w - watermarkWidth) / 2
-		case PositionTopRight:
-			x = w - watermarkWidth
-		case PositionLeft:
-			y = (h - watermarkHeight) / 2
-		case PositionCenter:
-			x = (w - watermarkWidth) / 2
-			y = (h - watermarkHeight) / 2
-		case PositionRight:
-			y = (h - watermarkHeight) / 2
-			x = w - watermarkWidth
-		case PositionBottomLeft:
-			y = h - watermarkHeight
-		case PositionBottom:
-			x = (w - watermarkWidth) / 2
-			y = h - watermarkHeight
-		case PositionBottomRight:
-			x = w - watermarkWidth
-			y = h - watermarkHeight
-		}
+		x, y := getWatermarkPosition(position, w, h, watermarkWidth, watermarkHeight)
 		grid := imaging.Paste(img.grid, watermarkImg, image.Pt(x, y))
 		img.Set(grid)
 		return img, nil

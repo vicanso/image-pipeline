@@ -21,6 +21,52 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetWatermarkPosition(t *testing.T) {
+	assert := assert.New(t)
+
+	w := 800
+	h := 600
+
+	watermarkWidth := 60
+	watermarkHeight := 40
+
+	x, y := getWatermarkPosition(PositionTopLeft, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(0, x)
+	assert.Equal(0, y)
+
+	x, y = getWatermarkPosition(PositionTop, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(370, x)
+	assert.Equal(0, y)
+
+	x, y = getWatermarkPosition(PositionTopRight, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(740, x)
+	assert.Equal(0, y)
+
+	x, y = getWatermarkPosition(PositionLeft, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(0, x)
+	assert.Equal(280, y)
+
+	x, y = getWatermarkPosition(PositionCenter, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(370, x)
+	assert.Equal(280, y)
+
+	x, y = getWatermarkPosition(PositionRight, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(740, x)
+	assert.Equal(280, y)
+
+	x, y = getWatermarkPosition(PositionBottomLeft, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(0, x)
+	assert.Equal(560, y)
+
+	x, y = getWatermarkPosition(PositionBottom, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(370, x)
+	assert.Equal(560, y)
+
+	x, y = getWatermarkPosition(PositionBottomRight, w, h, watermarkWidth, watermarkHeight)
+	assert.Equal(740, x)
+	assert.Equal(560, y)
+}
+
 func TestNewWatermark(t *testing.T) {
 	assert := assert.New(t)
 
