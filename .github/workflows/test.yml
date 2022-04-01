@@ -1,0 +1,50 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo
+        env:
+          MONGO_INITDB_ROOT_USERNAME: test
+          MONGO_INITDB_ROOT_PASSWORD: testabcd
+        ports:
+          - 27017:27017
+      minio:
+        image: minio/minio
+        env:
+          MINIO_ACCESS_KEY: test
+          MINIO_SECRET_KEY: testabcd
+        ports:
+          - 9000:9000
+    steps:
+
+    - name: Test 
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+    
+    - name: Get dependencies
+      run: 
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
+
+    - name: Lint
+      run: make lint
+
+    - name: Test
+      run: make test
+        ALIYUN_OSS_ACCESS_KEY: ${{ secrets.ALIYUN_OSS_ACCESS_KEY}}
+        ALIYUN_OSS_SECRET_KEY: ${{ secrets.ALIYUN_OSS_SECRET_KEY}}
