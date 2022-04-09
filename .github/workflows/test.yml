@@ -21,10 +21,12 @@ jobs:
         ports:
           - 27017:27017
       minio:
-        image: minio/minio
+        image: vicanso/minio
         env:
           MINIO_ACCESS_KEY: test
           MINIO_SECRET_KEY: testabcd
+        volumes:
+          - ${{ github.workspace }}/data:/data
         ports:
           - 9000:9000
     steps:
