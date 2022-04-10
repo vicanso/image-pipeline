@@ -28,6 +28,10 @@ jobs:
           MINIO_SECRET_KEY: testabcd
         ports:
           - 9000:9000
+      tiny:
+        image: vicanso/tiny
+        ports:
+          - 6002:7002
     steps:
 
     - name: Test 
