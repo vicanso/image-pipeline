@@ -47,26 +47,6 @@ type Finder interface {
 
 var finders = sync.Map{}
 
-// func init() {
-// 	initFinderFromENV()
-// }
-
-// func initFinderFromENV() {
-// 	finderPrefix := os.Getenv("IMAGE_PIPELINE_FINDER")
-// 	if finderPrefix != "" {
-// 		return
-// 	}
-// 	envs := os.Environ()
-// 	for _, item := range envs {
-// 		arr := strings.Split(item, "=")
-// 		if len(arr) != 2 {
-// 			continue
-// 		}
-// 		fmt.Println(arr[0])
-// 		// fmt.Println(arr)
-// 	}
-// }
-
 type httpFinder struct {
 	uh *upstream.HTTP
 }

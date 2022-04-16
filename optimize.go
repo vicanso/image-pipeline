@@ -97,12 +97,10 @@ func optimize(ctx context.Context, addr string, img *Image, quality int, format 
 func NewAutoOptimizeImage(addr string, quality int, accept string) Job {
 	return func(ctx context.Context, img *Image) (*Image, error) {
 		format := img.format
-		acceptWebp := strings.Contains(accept, "image/webp")
-		acceptAvif := strings.Contains(accept, "image/avif")
 
-		if acceptAvif {
+		if strings.Contains(accept, "image/avif") {
 			format = ImageTypeAVIF
-		} else if acceptWebp {
+		} else if strings.Contains(accept, "image/webp") {
 			format = ImageTypeWEBP
 			if format == ImageTypePNG {
 				quality = 0

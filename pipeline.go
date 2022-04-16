@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -82,6 +83,9 @@ func parseOptimize(params []string, _ string) (Job, error) {
 		return nil, errors.New("optimize addr can not be nil")
 	}
 	addr := params[0]
+	if os.Getenv(addr) != "" {
+		addr = os.Getenv(addr)
+	}
 	quality := 0
 	if len(params) > 1 {
 		quality, _ = strconv.Atoi(params[1])
@@ -98,11 +102,15 @@ func parseAutoOptimize(params []string, accept string) (Job, error) {
 	if len(params) == 0 {
 		return nil, errors.New("optimize addr can not be nil")
 	}
+	addr := params[0]
+	if os.Getenv(addr) != "" {
+		addr = os.Getenv(addr)
+	}
 	quality := 0
 	if len(params) > 1 {
 		quality, _ = strconv.Atoi(params[1])
 	}
-	return NewAutoOptimizeImage(params[0], quality, accept), nil
+	return NewAutoOptimizeImage(addr, quality, accept), nil
 }
 
 func parseFitResize(params []string, _ string) (Job, error) {

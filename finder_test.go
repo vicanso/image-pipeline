@@ -121,7 +121,7 @@ func TestMinioFinder(t *testing.T) {
 		assert.Nil(err)
 	}
 
-	err = AddMinioFinder(finderName, fmt.Sprintf("http://%s/?accessKey=%s&secretKey=%s", host, accessKey, secretKey))
+	err = AddMinioFinder(finderName, fmt.Sprintf("minio://%s/?accessKey=%s&secretKey=%s", host, accessKey, secretKey))
 	assert.Nil(err)
 
 	finder, err := GetFinder(finderName)
