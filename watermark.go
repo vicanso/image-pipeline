@@ -53,7 +53,7 @@ func getWatermarkPosition(position string, w, h, watermarkWidth, watermarkHeight
 
 // NewWatermark creates an image job, which will add watermark to image
 func NewWatermark(watermarkImg image.Image, position string, angle float64) Job {
-	return func(ctx context.Context, img *Image) (*Image, error) {
+	return func(_ context.Context, img *Image) (*Image, error) {
 		if angle != 0 {
 			watermarkImg = imaging.Rotate(watermarkImg, angle, color.Transparent)
 		}

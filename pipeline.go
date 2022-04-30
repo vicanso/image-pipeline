@@ -146,12 +146,35 @@ func parseFinder(params []string, _ string) (Job, error) {
 	}, nil
 }
 
+func parseWatermark(params []string, _ string) (Job, error) {
+	if len(params) == 0 {
+		return nil, errors.New("watermark image can not be nil")
+	}
+	position := PositionCenter
+	if len(params) > 1 {
+		position = params[1]
+	}
+	angle := 0.0
+	if len(params) > 2 {
+		angle, _ = strconv.ParseFloat(params[2], 64)
+	}
+	return func(ctx context.Context, i *Image) (*Image, error) {
+		watermarkImage, err := FetchImageFromURL(ctx, params[0])
+		if err != nil {
+			return nil, err
+		}
+		fn := NewWatermark(watermarkImage.grid, position, angle)
+		return fn(ctx, i)
+	}, nil
+}
+
 const (
 	TaskProxy        = "proxy"
 	TaskOptimize     = "optimize"
 	TaskAutoOptimize = "autoOptimize"
 	TaskFitResize    = "fitResize"
 	TaskFillResize   = "fillResize"
+	TaskWatermark    = "watermark"
 )
 
 // Parse parses the task pipe line to job list
