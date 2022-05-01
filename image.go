@@ -45,9 +45,10 @@ func NewImageFromBytes(data []byte) (*Image, error) {
 		return nil, err
 	}
 	return &Image{
-		originalSize: len(data),
-		format:       format,
-		grid:         img,
+		optimizedData: data,
+		originalSize:  len(data),
+		format:        format,
+		grid:          img,
 	}, nil
 }
 
@@ -109,4 +110,9 @@ func (i *Image) JPEG() ([]byte, error) {
 		return i.optimizedData, nil
 	}
 	return i.encode(ImageTypeJPEG)
+}
+
+// Bytes returns the bytes and format of image
+func (i *Image) Bytes() ([]byte, string) {
+	return i.optimizedData, i.format
 }

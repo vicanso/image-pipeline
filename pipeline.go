@@ -178,6 +178,12 @@ const (
 	TaskWatermark    = "watermark"
 )
 
+var taskAlias = map[string]string{}
+
+func TaskAlias(alias, name string) {
+	taskAlias[alias] = name
+}
+
 // Parse parses the task pipe line to job list
 func Parse(taskPipeLine, accept string) ([]Job, error) {
 	tasks := strings.Split(taskPipeLine, "|")
@@ -186,7 +192,12 @@ func Parse(taskPipeLine, accept string) ([]Job, error) {
 		var fn Parser
 		arr := strings.Split(v, "/")
 		args := arr[1:]
-		switch arr[0] {
+		name := arr[0]
+		value, ok := taskAlias[name]
+		if ok {
+			name = value
+		}
+		switch name {
 		case TaskProxy:
 			fn = parseProxy
 		case TaskOptimize:
