@@ -69,3 +69,13 @@ func TestParseFillResize(t *testing.T) {
 	}, "")
 	assert.Nil(err)
 }
+
+func TestParseWatermark(t *testing.T) {
+	assert := assert.New(t)
+
+	_, err := parseWatermark([]string{
+		"https://www.baidu.com/img/PCtm_d9c8750bed0b3c7d089fa7d55720d6cf.png",
+		"bottomRight",
+	}, "")
+	assert.Nil(err)
+}

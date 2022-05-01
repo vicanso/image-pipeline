@@ -158,8 +158,9 @@ func parseWatermark(params []string, _ string) (Job, error) {
 	if len(params) > 2 {
 		angle, _ = strconv.ParseFloat(params[2], 64)
 	}
+	watermarkURL := params[0]
 	return func(ctx context.Context, i *Image) (*Image, error) {
-		watermarkImage, err := FetchImageFromURL(ctx, params[0])
+		watermarkImage, err := FetchImageFromURL(ctx, watermarkURL)
 		if err != nil {
 			return nil, err
 		}
@@ -196,6 +197,8 @@ func Parse(taskPipeLine, accept string) ([]Job, error) {
 			fn = parseFitResize
 		case TaskFillResize:
 			fn = parseFillResize
+		case TaskWatermark:
+			fn = parseWatermark
 		default:
 			// finder的参数为所有参数
 			args = arr
