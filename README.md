@@ -93,7 +93,7 @@ func AddAliyunOSSFinder(name, uri string) error
 - `uri`: 连接串，格式如下：`https://oss-cn-beijing.aliyuncs.com?accessKey=key&secretKey=secret`
 
 ```go
-imagepipeline.AddGridFSFinder("myOSSImages", "https://oss-cn-beijing.aliyuncs.com?accessKey=key&secretKey=secret")
+imagepipeline.AddAliyunOSSFinder("myOSSImages", "https://oss-cn-beijing.aliyuncs.com?accessKey=key&secretKey=secret")
 ```
 
 ## Pipeline

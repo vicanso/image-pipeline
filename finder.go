@@ -254,6 +254,24 @@ func (af *aliyunOSSFinder) Close(_ context.Context) error {
 	return nil
 }
 
+func AddFinder(name, uri string) error {
+	if strings.HasPrefix(uri, "minio://") {
+		return AddMinioFinder(name, uri)
+	}
+	if strings.HasPrefix(uri, "mongodb://") {
+		return AddGridFSFinder(name, uri)
+	}
+	if strings.HasPrefix(uri, "aliyun://") {
+		uri = strings.Replace(uri, "aliyun://", "https://", 1)
+		return AddAliyunOSSFinder(name, uri)
+	}
+	if strings.HasPrefix(uri, "http://") ||
+		strings.HasPrefix(uri, "https://") {
+		return AddHTTPFinder(name, uri)
+	}
+	return AddFileFinder(name, uri)
+}
+
 // AddAliyunOSSFinder add aliyun oss finder
 func AddAliyunOSSFinder(name, uri string) error {
 	urlInfo, err := url.Parse(uri)
