@@ -188,15 +188,17 @@ func TaskAlias(alias, name string) {
 func Parse(taskPipeLine, accept string) ([]Job, error) {
 	tasks := strings.Split(taskPipeLine, "|")
 	jobs := make([]Job, 0, len(tasks))
+	sep := "/"
 	for _, v := range tasks {
 		var fn Parser
-		arr := strings.Split(v, "/")
-		args := arr[1:]
-		name := arr[0]
-		value, ok := taskAlias[name]
+		arr := strings.Split(v, sep)
+		value, ok := taskAlias[arr[0]]
 		if ok {
-			name = value
+			arr[0] = value
+			arr = strings.Split(strings.Join(arr, sep), sep)
 		}
+		name := arr[0]
+		args := arr[1:]
 		switch name {
 		case TaskProxy:
 			fn = parseProxy
